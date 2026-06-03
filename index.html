@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Habit Stack</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0e0c;
+    --surface: #1a1916;
+    --border: #2e2c28;
+    --text: #f0ece3;
+    --muted: #6b6760;
+    --accent: #e8d5a3;
+    --radius: 10px;
+    --cell: 36px;
+    --gap: 5px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px 120px;
+    gap: 32px;
+  }
+
+  header {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  header h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    font-size: 2.4rem;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+  }
+
+  header p {
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  /* Week nav */
+  .week-nav {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .week-nav button {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+    display: flex;align-items:center;justify-content:center;
+    transition: all 0.15s;
+  }
+  .week-nav button:hover { border-color: var(--accent); color: var(--accent); }
+
+  .week-label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    min-width: 160px;
+    text-align: center;
+  }
+
+  /* Grid */
+  .grid-wrapper {
+    width: 100%;
+    max-width: 560px;
+  }
+
+  .day-labels {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: var(--gap);
+    margin-bottom: 8px;
+  }
+
+  .day-label {
+    text-align: center;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 4px 0;
+  }
+
+  .day-label.today { color: var(--accent); }
+
+  .columns-area {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: var(--gap);
+    align-items: end;
+    min-height: 320px;
+  }
+
+  .day-col {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: var(--gap);
+    align-items: center;
+    min-height: 320px;
+    position: relative;
+  }
+
+  .day-col.today-col::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .habit-block {
+    width: calc(100% - 4px);
+    height: var(--cell);
+    border-radius: 8px;
+    flex-shrink: 0;
+    position: relative;
+    transition: transform 0.15s, opacity 0.15s;
+    cursor: default;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .habit-block:hover { transform: scaleX(1.06); opacity: 0.9; }
+
+
+
+  .habit-block[data-count="2"] { height: calc(var(--cell) * 1.6); border-radius: 9px; }
+  .habit-block[data-count="3"] { height: calc(var(--cell) * 2.2); border-radius: 10px; }
+  .habit-block[data-count="4"] { height: calc(var(--cell) * 2.8); border-radius: 11px; }
+  .habit-block[data-count="5"] { height: calc(var(--cell) * 3.4); border-radius: 12px; }
+  .habit-block[data-count="6"] { height: calc(var(--cell) * 4); border-radius: 12px; }
+  .habit-block[data-count="7"] { height: calc(var(--cell) * 4.6); border-radius: 12px; }
+  .habit-block[data-count="8"] { height: calc(var(--cell) * 5); border-radius: 12px; }
+
+  /* Bottom bar */
+  .bottom-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(15,14,12,0.92);
+    backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border);
+    padding: 12px 16px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    z-index: 100;
+  }
+
+  .habit-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 560px;
+  }
+
+  .habit-btn {
+    border: none;
+    border-radius: 20px;
+    padding: 8px 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: transform 0.1s, filter 0.1s;
+    font-weight: 500;
+  }
+
+  .habit-btn:hover { transform: translateY(-2px); filter: brightness(1.15); }
+  .habit-btn:active { transform: translateY(0) scale(0.96); }
+
+  .habit-btn .plus {
+    font-size: 1rem;
+    font-weight: 400;
+    opacity: 0.7;
+    line-height: 1;
+  }
+
+  .manage-btn {
+    font-size: 0.65rem;
+    color: var(--muted);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.08em;
+    transition: all 0.15s;
+  }
+  .manage-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* Summary banner (Sunday) */
+  .summary-banner {
+    width: 100%;
+    max-width: 560px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    display: none;
+  }
+
+  .summary-banner.visible { display: block; }
+
+  .summary-banner h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 1.1rem;
+    font-weight: 300;
+    color: var(--accent);
+    margin-bottom: 14px;
+    font-style: italic;
+  }
+
+  .summary-rows { display: flex; flex-direction: column; gap: 8px; }
+
+  .summary-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .summary-dot {
+    width: 10px; height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  .summary-name {
+    flex: 1;
+    font-size: 0.75rem;
+    color: var(--text);
+  }
+
+  .summary-count {
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .summary-bar-track {
+    flex: 2;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .summary-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.6s cubic-bezier(.22,1,.36,1);
+  }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s;
+  }
+
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    width: min(480px, calc(100vw - 32px));
+    max-height: 80vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .modal h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 1.4rem;
+    font-weight: 300;
+    color: var(--accent);
+  }
+
+  .habit-list-edit { display: flex; flex-direction: column; gap: 10px; }
+
+  .habit-row-edit {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+
+  .color-swatch {
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    flex-shrink: 0;
+  }
+
+  .habit-name-input {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    outline: none;
+  }
+
+  .delete-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 4px;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+  .delete-btn:hover { color: #e07070; }
+
+  .add-habit-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .add-name-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    padding: 8px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .add-name-input:focus { border-color: var(--accent); }
+
+  .color-picker-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .color-opt {
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.1s, border-color 0.1s;
+  }
+  .color-opt:hover { transform: scale(1.15); }
+  .color-opt.selected { border-color: white; }
+
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-weight: 500;
+    transition: filter 0.15s;
+  }
+  .btn-primary:hover { filter: brightness(1.1); }
+
+  .btn-ghost {
+    background: none;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+
+  .add-habit-btn {
+    background: var(--bg);
+    border: 1px dashed var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.05em;
+  }
+  .add-habit-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .empty-state {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.75rem;
+    padding: 48px 0 16px;
+    letter-spacing: 0.05em;
+    line-height: 1.8;
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    top: 20px; left: 50%;
+    transform: translateX(-50%) translateY(-60px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 0.72rem;
+    color: var(--text);
+    z-index: 300;
+    transition: transform 0.3s cubic-bezier(.34,1.56,.64,1);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .count-badge {
+    display: none;
+  }
+
+
+
+  @keyframes popIn {
+    0% { transform: scaleY(0.4) scaleX(0.8); opacity: 0; }
+    60% { transform: scaleY(1.08) scaleX(1.02); }
+    100% { transform: scaleY(1) scaleX(1); opacity: 1; }
+  }
+
+  .habit-block.new-block {
+    animation: popIn 0.28s cubic-bezier(.22,1,.36,1) both;
+    transform-origin: bottom center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Habit Stack</h1>
+  <p id="header-date">Loading...</p>
+</header>
+
+<div class="week-nav">
+  <button id="prev-week" title="Previous week">‹</button>
+  <span class="week-label" id="week-label">—</span>
+  <button id="next-week" title="Next week">›</button>
+</div>
+
+<div class="grid-wrapper">
+  <div class="day-labels" id="day-labels"></div>
+  <div class="columns-area" id="columns-area"></div>
+</div>
+
+<div class="summary-banner" id="summary-banner">
+  <h2>✦ Weekly summary</h2>
+  <div class="summary-rows" id="summary-rows"></div>
+</div>
+
+<div class="bottom-bar">
+  <div class="habit-buttons" id="habit-buttons"></div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <button class="manage-btn" id="undo-btn" title="Undo last log" disabled style="opacity:0.35;">↩ undo</button>
+    <button class="manage-btn" id="manage-btn">manage habits</button>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h2>Habits</h2>
+    <div class="habit-list-edit" id="habit-list-edit"></div>
+    <div id="add-area">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+        <input class="add-name-input" id="new-habit-name" placeholder="new habit name…" maxlength="24">
+        <button class="add-habit-btn" id="add-habit-btn">+ add</button>
+      </div>
+      <div class="color-picker-row" id="color-picker-row"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="modal-cancel">cancel</button>
+      <button class="btn-primary" id="modal-save">save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── Constants ───────────────────────────────────────────────────────────────
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const STORAGE_KEY = 'habitstack_v2';
+const PALETTE = [
+  '#e8836a','#e8c56a','#6ab8e8','#6ae8a0','#c56ae8','#e86a9f',
+  '#6ae8e8','#a0e86a','#e8a06a','#8a6ae8','#6ae872','#e86a6a',
+  '#f0b970','#70c9f0','#b3e870','#e870c9'
+];
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let state = {
+  habits: [],   // {id, name, color}
+  logs: {}      // { 'YYYY-MM-DD': { habitId: count } }
+};
+let viewOffset = 0;   // 0 = current week, -1 = last week, etc.
+let pendingColor = PALETTE[0];
+let editSnapshot = [];
+let undoStack = [];   // array of {logs snapshot, habitId, habitName}
+
+// ─── Storage ─────────────────────────────────────────────────────────────────
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function load() {
+  try {
+    const s = localStorage.getItem(STORAGE_KEY);
+    if (s) state = JSON.parse(s);
+  } catch(e) {}
+}
+
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+function today() {
+  const d = new Date();
+  return ymd(d);
+}
+
+function ymd(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function getWeekDates(offset = 0) {
+  const now = new Date();
+  const dow = now.getDay(); // 0=Sun
+  const sunday = new Date(now);
+  sunday.setDate(now.getDate() - dow + offset * 7);
+  return Array.from({length: 7}, (_, i) => {
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
+    return d;
+  });
+}
+
+function isSunday() {
+  return new Date().getDay() === 6; // Saturday = 6... wait Sun=0
+  // Actually Sunday = 0
+}
+
+function isCurrentWeek() { return viewOffset === 0; }
+function isTodayDate(dateObj) { return ymd(dateObj) === today(); }
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  const dates = getWeekDates(viewOffset);
+  const todayStr = today();
+
+  // Header date
+  document.getElementById('header-date').textContent =
+    new Date().toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
+
+  // Week label
+  const fmt = d => d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+  document.getElementById('week-label').textContent =
+    `${fmt(dates[0])} – ${fmt(dates[6])}`;
+
+  // Day labels
+  const labelsEl = document.getElementById('day-labels');
+  labelsEl.innerHTML = '';
+  dates.forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'day-label' + (ymd(d) === todayStr ? ' today' : '');
+    el.textContent = DAYS[d.getDay()];
+    labelsEl.appendChild(el);
+  });
+
+  // Columns
+  const colsEl = document.getElementById('columns-area');
+  colsEl.innerHTML = '';
+  dates.forEach(d => {
+    const key = ymd(d);
+    const col = document.createElement('div');
+    col.className = 'day-col' + (key === todayStr ? ' today-col' : '');
+
+    const dayLog = state.logs[key] || {};
+    // Render one block per habit that has count > 0
+    state.habits.forEach(h => {
+      const cnt = dayLog[h.id] || 0;
+      if (cnt === 0) return;
+      const block = document.createElement('div');
+      block.className = 'habit-block';
+      block.dataset.count = Math.min(cnt, 8);
+      block.style.background = h.color;
+      block.dataset.habit = h.id;
+      col.appendChild(block);
+    });
+
+    colsEl.appendChild(col);
+  });
+
+  // Bottom buttons
+  renderButtons();
+
+  // Summary (show on Sunday of current week, or if current view contains today=Sunday)
+  renderSummary(dates);
+
+  // Sync undo button state
+  updateUndoBtn();
+}
+
+function renderButtons() {
+  const el = document.getElementById('habit-buttons');
+  el.innerHTML = '';
+  if (state.habits.length === 0) {
+    el.innerHTML = '<span style="color:var(--muted);font-size:0.7rem;letter-spacing:0.08em;">no habits yet — add some above</span>';
+    return;
+  }
+  state.habits.forEach(h => {
+    const btn = document.createElement('button');
+    btn.className = 'habit-btn';
+    btn.style.background = h.color + '22';
+    btn.style.color = h.color;
+    btn.style.border = `1px solid ${h.color}44`;
+    btn.innerHTML = `<span class="plus">+</span>${h.name}`;
+    btn.addEventListener('click', () => logHabit(h.id, h.name));
+    el.appendChild(btn);
+  });
+}
+
+function renderSummary(dates) {
+  const banner = document.getElementById('summary-banner');
+  const rowsEl = document.getElementById('summary-rows');
+  const todayStr = today();
+  const todayInView = dates.some(d => ymd(d) === todayStr);
+  const isSun = new Date().getDay() === 0; // 0 = Sunday
+
+  // Show on Sundays OR show for any viewed week's summary toggle
+  const shouldShow = isCurrentWeek() && isSun && todayInView;
+
+  if (!shouldShow && !document.getElementById('summary-banner').classList.contains('force-show')) {
+    banner.classList.remove('visible');
+    return;
+  }
+
+  banner.classList.add('visible');
+  rowsEl.innerHTML = '';
+
+  // Tally all logs for the week
+  const totals = {};
+  state.habits.forEach(h => totals[h.id] = 0);
+  dates.forEach(d => {
+    const key = ymd(d);
+    const dl = state.logs[key] || {};
+    state.habits.forEach(h => { totals[h.id] = (totals[h.id]||0) + (dl[h.id]||0); });
+  });
+
+  const max = Math.max(1, ...Object.values(totals));
+
+  state.habits.forEach(h => {
+    const row = document.createElement('div');
+    row.className = 'summary-row';
+    row.innerHTML = `
+      <div class="summary-dot" style="background:${h.color}"></div>
+      <div class="summary-name">${h.name}</div>
+      <div class="summary-bar-track">
+        <div class="summary-bar-fill" style="background:${h.color};width:${(totals[h.id]/max)*100}%"></div>
+      </div>
+      <div class="summary-count">${totals[h.id]}</div>
+    `;
+    rowsEl.appendChild(row);
+  });
+}
+
+// ─── Undo ─────────────────────────────────────────────────────────────────────
+function pushUndo(habitName) {
+  undoStack.push({ logs: JSON.parse(JSON.stringify(state.logs)), habitName });
+  if (undoStack.length > 50) undoStack.shift();
+  updateUndoBtn();
+}
+
+function undoLast() {
+  if (!undoStack.length) return;
+  const { logs, habitName } = undoStack.pop();
+  state.logs = logs;
+  save();
+  render();
+  updateUndoBtn();
+  showToast(`↩ undid ${habitName}`);
+}
+
+function updateUndoBtn() {
+  const btn = document.getElementById('undo-btn');
+  if (!btn) return;
+  btn.disabled = undoStack.length === 0;
+  btn.style.opacity = undoStack.length === 0 ? '0.35' : '1';
+}
+
+// ─── Logging ──────────────────────────────────────────────────────────────────
+function logHabit(habitId, habitName) {
+  pushUndo(habitName);
+  const key = today();
+  if (!state.logs[key]) state.logs[key] = {};
+  state.logs[key][habitId] = (state.logs[key][habitId] || 0) + 1;
+  save();
+
+  // Animate: find the column for today, update it
+  render();
+  // Animate last added block
+  const todayStr = today();
+  const dates = getWeekDates(viewOffset);
+  const colIdx = dates.findIndex(d => ymd(d) === todayStr);
+  if (colIdx >= 0) {
+    const cols = document.querySelectorAll('.day-col');
+    if (cols[colIdx]) {
+      const blocks = cols[colIdx].querySelectorAll('.habit-block');
+      // find block for this habit
+      const habitIdx = state.habits.findIndex(h => h.id === habitId);
+      // blocks are reversed (column-reverse), find matching
+      if (blocks.length > 0) {
+        // topmost (last in DOM since column-reverse) matching
+        blocks.forEach(b => {
+          if (b.dataset.habit === habitId) {
+            b.classList.add('new-block');
+          }
+        });
+      }
+    }
+  }
+
+  showToast(`+1 ${habitName}`);
+}
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1600);
+}
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
+function openModal() {
+  editSnapshot = state.habits.map(h => ({...h}));
+  renderModalList();
+  renderColorPicker();
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  document.getElementById('new-habit-name').value = '';
+}
+
+function renderModalList() {
+  const el = document.getElementById('habit-list-edit');
+  el.innerHTML = '';
+  if (editSnapshot.length === 0) {
+    el.innerHTML = '<div class="empty-state">No habits yet.<br>Add your first one below.</div>';
+    return;
+  }
+  editSnapshot.forEach((h, i) => {
+    const row = document.createElement('div');
+    row.className = 'habit-row-edit';
+    row.innerHTML = `
+      <div class="color-swatch" style="background:${h.color}" data-idx="${i}" title="click to change color"></div>
+      <input class="habit-name-input" value="${h.name}" data-idx="${i}" maxlength="24">
+      <button class="delete-btn" data-idx="${i}" title="remove">✕</button>
+    `;
+    el.appendChild(row);
+  });
+
+  // Events
+  el.querySelectorAll('.habit-name-input').forEach(inp => {
+    inp.addEventListener('input', e => {
+      editSnapshot[+e.target.dataset.idx].name = e.target.value;
+    });
+  });
+
+  el.querySelectorAll('.color-swatch').forEach(sw => {
+    sw.addEventListener('click', e => {
+      const idx = +e.target.dataset.idx;
+      const c = prompt('Enter hex color (e.g. #e8836a):', editSnapshot[idx].color);
+      if (c && /^#[0-9a-fA-F]{6}$/.test(c.trim())) {
+        editSnapshot[idx].color = c.trim();
+        e.target.style.background = c.trim();
+      }
+    });
+  });
+
+  el.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const idx = +e.target.dataset.idx;
+      editSnapshot.splice(idx, 1);
+      renderModalList();
+    });
+  });
+}
+
+function renderColorPicker() {
+  const el = document.getElementById('color-picker-row');
+  el.innerHTML = '';
+  PALETTE.forEach((c, i) => {
+    const opt = document.createElement('div');
+    opt.className = 'color-opt' + (c === pendingColor ? ' selected' : '');
+    opt.style.background = c;
+    opt.dataset.color = c;
+    opt.addEventListener('click', () => {
+      pendingColor = c;
+      el.querySelectorAll('.color-opt').forEach(o => o.classList.remove('selected'));
+      opt.classList.add('selected');
+    });
+    el.appendChild(opt);
+  });
+}
+
+function addHabit() {
+  const nameEl = document.getElementById('new-habit-name');
+  const name = nameEl.value.trim();
+  if (!name) { nameEl.focus(); return; }
+
+  const id = 'h_' + Date.now();
+  editSnapshot.push({ id, name, color: pendingColor });
+  nameEl.value = '';
+  // Pick next color
+  const idx = PALETTE.indexOf(pendingColor);
+  pendingColor = PALETTE[(idx + 1) % PALETTE.length];
+  renderModalList();
+  renderColorPicker();
+}
+
+function saveModal() {
+  state.habits = editSnapshot.map(h => ({...h}));
+  save();
+  render();
+  closeModal();
+}
+
+// ─── Week Navigation ──────────────────────────────────────────────────────────
+document.getElementById('prev-week').addEventListener('click', () => { viewOffset--; render(); });
+document.getElementById('next-week').addEventListener('click', () => { viewOffset++; render(); });
+
+// ─── Modal Events ─────────────────────────────────────────────────────────────
+document.getElementById('manage-btn').addEventListener('click', openModal);
+document.getElementById('modal-cancel').addEventListener('click', closeModal);
+document.getElementById('modal-save').addEventListener('click', saveModal);
+document.getElementById('add-habit-btn').addEventListener('click', addHabit);
+document.getElementById('new-habit-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addHabit();
+});
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+});
+
+// ─── Undo button ──────────────────────────────────────────────────────────────
+document.getElementById('undo-btn').addEventListener('click', undoLast);
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undoLast(); }
+});
+
+// ─── Sunday summary force toggle ─────────────────────────────────────────────
+document.getElementById('summary-banner').addEventListener('click', () => {
+  document.getElementById('summary-banner').classList.remove('force-show');
+  render();
+});
+
+// add a "summary" button in the bottom bar actions row
+const summaryToggleBtn = document.createElement('button');
+summaryToggleBtn.className = 'manage-btn';
+summaryToggleBtn.textContent = 'week summary';
+summaryToggleBtn.addEventListener('click', () => {
+  const banner = document.getElementById('summary-banner');
+  if (banner.classList.contains('visible')) {
+    banner.classList.remove('visible','force-show');
+  } else {
+    banner.classList.add('visible','force-show');
+    renderSummary(getWeekDates(viewOffset));
+  }
+});
+// Insert before undo btn in the actions row
+const actionsRow = document.getElementById('undo-btn').parentElement;
+actionsRow.insertBefore(summaryToggleBtn, document.getElementById('undo-btn'));
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+load();
+
+// Seed defaults if first run
+if (state.habits.length === 0) {
+  state.habits = [
+    { id: 'h_1', name: 'exercise', color: '#6ab8e8' },
+    { id: 'h_2', name: 'read',     color: '#e8836a' },
+    { id: 'h_3', name: 'meditate', color: '#6ae8a0' },
+  ];
+  save();
+}
+
+render();
+</script>
+</body>
+</html>
