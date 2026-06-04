@@ -365,18 +365,59 @@
   }
 
   .add-name-input {
-    flex: 1;
+    width: 100%;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 8px;
     color: var(--text);
     font-family: 'DM Mono', monospace;
-    font-size: 0.8rem;
-    padding: 8px 12px;
+    font-size: 0.85rem;
+    padding: 10px 14px;
     outline: none;
     transition: border-color 0.15s;
   }
   .add-name-input:focus { border-color: var(--accent); }
+
+  .new-habit-area {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+  }
+
+  .btn-add-habit {
+    width: 100%;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 8px;
+    padding: 11px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: filter 0.15s;
+    letter-spacing: 0.05em;
+  }
+  .btn-add-habit:hover { filter: brightness(1.1); }
+
+  .btn-done {
+    width: 100%;
+    background: none;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    cursor: pointer;
+    letter-spacing: 0.08em;
+    transition: all 0.15s;
+  }
+  .btn-done:hover { color: var(--text); border-color: var(--muted); }
 
   .color-picker-row {
     display: flex;
@@ -393,53 +434,6 @@
   }
   .color-opt:hover { transform: scale(1.15); }
   .color-opt.selected { border-color: white; }
-
-  .modal-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-  }
-
-  .btn-primary {
-    background: var(--accent);
-    color: var(--bg);
-    border: none;
-    border-radius: 8px;
-    padding: 8px 18px;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.75rem;
-    cursor: pointer;
-    font-weight: 500;
-    transition: filter 0.15s;
-  }
-  .btn-primary:hover { filter: brightness(1.1); }
-
-  .btn-ghost {
-    background: none;
-    color: var(--muted);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 18px;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.75rem;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
-
-  .add-habit-btn {
-    background: var(--bg);
-    border: 1px dashed var(--border);
-    color: var(--muted);
-    border-radius: 8px;
-    padding: 8px 14px;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.75rem;
-    cursor: pointer;
-    transition: all 0.15s;
-    letter-spacing: 0.05em;
-  }
-  .add-habit-btn:hover { border-color: var(--accent); color: var(--accent); }
 
   .empty-state {
     text-align: center;
@@ -522,17 +516,12 @@
   <div class="modal">
     <h2>Habits</h2>
     <div class="habit-list-edit" id="habit-list-edit"></div>
-    <div id="add-area">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-        <input class="add-name-input" id="new-habit-name" placeholder="new habit name…" maxlength="24">
-        <button class="add-habit-btn" id="add-habit-btn">+ add</button>
-      </div>
+    <div class="new-habit-area" id="add-area">
       <div class="color-picker-row" id="color-picker-row"></div>
+      <input class="add-name-input" id="new-habit-name" placeholder="habit name…" maxlength="24">
+      <button class="btn-add-habit" id="add-habit-btn">+ Add habit</button>
     </div>
-    <div class="modal-actions">
-      <button class="btn-ghost" id="modal-cancel">cancel</button>
-      <button class="btn-primary" id="modal-save">save</button>
-    </div>
+    <button class="btn-done" id="modal-save">Done</button>
   </div>
 </div>
 
@@ -540,7 +529,7 @@
 
 <script>
 // ─── Constants ───────────────────────────────────────────────────────────────
-const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const STORAGE_KEY = 'habitstack_v2';
 const PALETTE = [
   '#e8836a','#e8c56a','#6ab8e8','#6ae8a0','#c56ae8','#e86a9f',
@@ -579,12 +568,14 @@ function ymd(d) {
 
 function getWeekDates(offset = 0) {
   const now = new Date();
-  const dow = now.getDay(); // 0=Sun
-  const sunday = new Date(now);
-  sunday.setDate(now.getDate() - dow + offset * 7);
+  const dow = now.getDay(); // 0=Sun,1=Mon,...
+  // Shift so week starts Monday: distance back to last Monday
+  const distToMon = (dow + 6) % 7;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - distToMon + offset * 7);
   return Array.from({length: 7}, (_, i) => {
-    const d = new Date(sunday);
-    d.setDate(sunday.getDate() + i);
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
     return d;
   });
 }
@@ -617,7 +608,7 @@ function render() {
   dates.forEach(d => {
     const el = document.createElement('div');
     el.className = 'day-label' + (ymd(d) === todayStr ? ' today' : '');
-    el.textContent = DAYS[d.getDay()];
+    el.textContent = d.toLocaleDateString('en-US', { weekday: 'short' }).slice(0,3);
     labelsEl.appendChild(el);
   });
 
@@ -679,7 +670,7 @@ function renderSummary(dates) {
   const rowsEl = document.getElementById('summary-rows');
   const todayStr = today();
   const todayInView = dates.some(d => ymd(d) === todayStr);
-  const isSun = new Date().getDay() === 0; // 0 = Sunday
+  const isSun = new Date().getDay() === 0; // 0 = Sunday in JS
 
   // Show on Sundays OR show for any viewed week's summary toggle
   const shouldShow = isCurrentWeek() && isSun && todayInView;
@@ -878,6 +869,9 @@ function addHabit() {
 }
 
 function saveModal() {
+  // Auto-commit any pending typed name before saving
+  const nameEl = document.getElementById('new-habit-name');
+  if (nameEl.value.trim()) addHabit();
   state.habits = editSnapshot.map(h => ({...h}));
   save();
   render();
@@ -890,7 +884,6 @@ document.getElementById('next-week').addEventListener('click', () => { viewOffse
 
 // ─── Modal Events ─────────────────────────────────────────────────────────────
 document.getElementById('manage-btn').addEventListener('click', openModal);
-document.getElementById('modal-cancel').addEventListener('click', closeModal);
 document.getElementById('modal-save').addEventListener('click', saveModal);
 document.getElementById('add-habit-btn').addEventListener('click', addHabit);
 document.getElementById('new-habit-name').addEventListener('keydown', e => {
